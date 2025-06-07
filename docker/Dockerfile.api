@@ -1,0 +1,74 @@
+# OCR Platform - API Dockerfile
+# ==============================
+# Container otimizado para FastAPI com dependências mínimas
+
+FROM python:3.11-slim as base
+
+# Metadados
+LABEL maintainer="OCR Platform Team"
+LABEL version="2.0.0"
+LABEL description="OCR Platform FastAPI API Container"
+
+# Variáveis de ambiente
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    DEBIAN_FRONTEND=noninteractive
+
+# Instalar dependências do sistema
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    git \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# Criar usuário não-root
+RUN groupadd -r ocruser && useradd -r -g ocruser ocruser
+
+# Criar diretórios
+RUN mkdir -p /app /app/uploads /app/results /app/temp /app/logs && \
+    chown -R ocruser:ocruser /app
+
+WORKDIR /app
+
+# === STAGE: Dependências ===
+FROM base as dependencies
+
+# Copiar requirements
+COPY requirements/base.txt requirements/api.txt ./requirements/
+
+# Instalar dependências Python
+RUN pip install --upgrade pip && \
+    pip install -r requirements/base.txt && \
+    pip install -r requirements/api.txt
+
+# === STAGE: Aplicação ===
+FROM dependencies as application
+
+# Copiar código da aplicação
+COPY --chown=ocruser:ocruser app/ ./app/
+COPY --chown=ocruser:ocruser scripts/ ./scripts/
+COPY --chown=ocruser:ocruser Makefile ./Makefile
+COPY --chown=ocruser:ocruser .env.example ./.env
+
+# Instalar make
+USER root
+RUN apt-get update && apt-get install -y --no-install-recommends make && \
+    rm -rf /var/lib/apt/lists/*
+
+# Fazer scripts executáveis
+RUN chmod +x scripts/start_api.py
+
+# Mudar para usuário não-root
+USER ocruser
+
+# Expor porta
+EXPOSE 8000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:8000/api/v1/health || exit 1
+
+# Comando padrão usando o Makefile
+CMD ["make", "start-api"]

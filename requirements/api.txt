@@ -1,0 +1,109 @@
+# OCR Platform - API Dependencies
+# ================================
+# Dependências específicas para o componente API (FastAPI)
+
+# Include base dependencies
+-r base.txt
+
+# FastAPI and ASGI server
+fastapi>=0.104.0,<1.0.0
+uvicorn[standard]>=0.24.0,<1.0.0
+gunicorn>=21.2.0,<22.0.0  # Production WSGI server
+
+# ASGI middleware
+starlette>=0.27.0,<1.0.0
+anyio>=3.7.0,<5.0.0
+
+# Authentication and security
+python-jose[cryptography]>=3.3.0,<4.0.0
+passlib[bcrypt]>=1.7.4,<2.0.0
+python-multipart>=0.0.6,<1.0.0  # File uploads
+
+# CORS middleware
+fastapi-cors>=0.0.6,<1.0.0
+
+# Rate limiting
+slowapi>=0.1.8,<1.0.0
+limits>=3.5.0,<4.0.0
+
+# Request/Response validation
+email-validator>=2.0.0,<3.0.0
+phonenumbers>=8.13.0,<9.0.0
+
+# OpenAPI documentation
+fastapi-openapi-generator>=0.3.0,<1.0.0
+
+# Dependency injection
+dependency-injector>=4.41.0,<5.0.0
+
+# Background tasks
+fastapi-utils>=0.2.1,<1.0.0
+
+# Templating (for error pages, etc.)
+jinja2>=3.1.0,<4.0.0
+
+# Static files
+aiofiles>=23.1.0,<24.0.0
+
+# HTTP client for async requests
+httpx>=0.24.0,<1.0.0
+
+# WebSocket support
+websockets>=11.0.0,<12.0.0
+
+# Streaming responses
+fastapi-streaming>=0.1.0,<1.0.0
+
+# API versioning
+fastapi-versioning>=0.10.0,<1.0.0
+
+# Request ID tracking
+asgi-correlation-id>=4.0.0,<5.0.0
+
+# Metrics and monitoring
+prometheus-fastapi-instrumentator>=6.0.0,<7.0.0
+opentelemetry-api>=1.17.0,<2.0.0
+opentelemetry-sdk>=1.17.0,<2.0.0
+opentelemetry-instrumentation-fastapi>=0.38b0,<1.0.0
+
+# Health checks
+fastapi-health>=0.4.0,<1.0.0
+
+# Content negotiation
+fastapi-accept>=0.0.3,<1.0.0
+
+# Response compression
+fastapi-gzip>=0.1.0,<1.0.0
+
+# Pagination
+fastapi-pagination>=0.12.0,<1.0.0
+
+# File handling
+fastapi-uploads>=0.1.0,<1.0.0
+
+# API testing utilities
+httpx>=0.24.0,<1.0.0  # For testing
+
+# Timezone support for API
+pytz>=2023.3
+
+# JSON Web Tokens
+PyJWT>=2.6.0,<3.0.0
+
+# URL routing
+fastapi-router>=0.1.0,<1.0.0
+
+# API documentation theme
+fastapi-swagger-ui-themes>=0.1.0,<1.0.0
+
+# Request caching
+fastapi-cache2>=0.2.0,<1.0.0
+
+# Form handling
+python-multipart>=0.0.6,<1.0.0
+
+# Session management
+fastapi-sessions>=0.3.2,<1.0.0
+
+# Exception handling
+fastapi-exception-handlers>=0.1.0,<1.0.0

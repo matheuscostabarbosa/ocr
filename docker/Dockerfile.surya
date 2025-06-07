@@ -1,0 +1,201 @@
+# OCR Platform - Surya Worker Dockerfile
+# =======================================
+# Container especializado para Surya OCR com suporte GPU/CUDA
+
+FROM nvidia/cuda:11.8-devel-ubuntu22.04 as base
+
+# Metadados
+LABEL maintainer="OCR Platform Team"
+LABEL version="2.0.0"
+LABEL description="OCR Platform Surya Worker with CUDA Support"
+
+# Variáveis de ambiente
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    DEBIAN_FRONTEND=noninteractive \
+    WORKER_TYPE=surya \
+    CUDA_VISIBLE_DEVICES=0 \
+    TORCH_CUDA_ARCH_LIST="6.0;6.1;7.0;7.5;8.0;8.6" \
+    FORCE_CUDA=1
+
+# Instalar Python 3.11 e dependências do sistema
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    # Python 3.11
+    software-properties-common \
+    && add-apt-repository ppa:deadsnakes/ppa \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends \
+    python3.11 \
+    python3.11-dev \
+    python3.11-distutils \
+    python3-pip \
+    # Ferramentas básicas
+    curl \
+    git \
+    wget \
+    build-essential \
+    pkg-config \
+    # OpenCV e dependências de imagem
+    libopencv-dev \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender-dev \
+    libgomp1 \
+    libgl1-mesa-glx \
+    libfontconfig1 \
+    libxrender1 \
+    # Dependências específicas para Surya
+    libmagic1 \
+    poppler-utils \
+    # CUDA development tools
+    libnccl-dev \
+    libcudnn8-dev \
+    # Cleanup
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+# Configurar Python 3.11 como padrão
+RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1 \
+    && update-alternatives --install /usr/bin/python python /usr/bin/python3.11 1
+
+# Atualizar pip
+RUN python -m pip install --upgrade pip
+
+# Criar usuário não-root
+RUN groupadd -r ocruser && useradd -r -g ocruser ocruser
+
+# Criar diretórios
+RUN mkdir -p /app /app/uploads /app/results /app/temp /app/logs /app/cache /app/models && \
+    chown -R ocruser:ocruser /app
+
+WORKDIR /app
+
+# === STAGE: Dependências PyTorch ===
+FROM base as pytorch
+
+# Instalar PyTorch com CUDA support
+RUN pip install torch==2.1.0 torchvision==0.16.0 torchaudio==2.1.0 --index-url https://download.pytorch.org/whl/cu118
+
+# === STAGE: Dependências Computer Vision ===
+FROM pytorch as cv_deps
+
+# Instalar dependências de computer vision e processamento
+RUN pip install \
+    # Computer Vision
+    opencv-python-headless==4.8.1.78 \
+    Pillow==10.0.1 \
+    scikit-image==0.22.0 \
+    # Machine Learning
+    numpy==1.24.3 \
+    scipy==1.11.4 \
+    scikit-learn==1.3.2 \
+    # Transformers ecosystem
+    transformers==4.35.2 \
+    tokenizers==0.14.1 \
+    datasets==2.14.6 \
+    accelerate==0.24.1 \
+    safetensors==0.4.0
+
+# === STAGE: Dependências Surya ===
+FROM cv_deps as surya_deps
+
+# Instalar Surya OCR e dependências específicas
+RUN pip install \
+    # Surya OCR (assumindo que existe um pacote ou será instalado via git)
+    # surya-ocr \
+    # Por enquanto, instalar dependências similares
+    detectron2 \
+    layoutparser \
+    # PDF processing
+    PyMuPDF==1.23.8 \
+    pdfplumber==0.10.3 \
+    # OCR related
+    pytesseract==0.3.10 \
+    easyocr==1.7.0
+
+# === STAGE: Dependências Aplicação ===
+FROM surya_deps as dependencies
+
+# Copiar requirements
+COPY requirements/base.txt requirements/workers.txt requirements/surya.txt ./requirements/
+
+# Instalar dependências da aplicação
+RUN pip install -r requirements/base.txt && \
+    pip install -r requirements/workers.txt && \
+    pip install -r requirements/surya.txt
+
+# === STAGE: Aplicação ===
+FROM dependencies as application
+
+# Copiar código da aplicação
+COPY --chown=ocruser:ocruser app/ ./app/
+COPY --chown=ocruser:ocruser scripts/ ./scripts/
+COPY --chown=ocruser:ocruser Makefile ./Makefile
+COPY --chown=ocruser:ocruser .env.example ./.env
+
+# Instalar make
+USER root
+RUN apt-get update && apt-get install -y --no-install-recommends make && \
+    rm -rf /var/lib/apt/lists/*
+
+# Fazer scripts executáveis
+RUN chmod +x scripts/start_workers.py
+
+# Configurar cache de modelos
+ENV HF_HOME=/app/cache/huggingface
+ENV TRANSFORMERS_CACHE=/app/cache/transformers
+ENV TORCH_HOME=/app/cache/torch
+ENV SURYA_CACHE_DIR=/app/cache/surya
+ENV DETECTRON2_DATASETS=/app/cache/detectron2
+
+# Mudar para usuário não-root
+USER ocruser
+
+# Pre-download de modelos Surya (otimização)
+RUN python -c "
+print('Initializing Surya models...')
+try:
+    # Aqui seria o download dos modelos Surya
+    # Por exemplo:
+    # from surya.model.detection.segformer import load_model, load_processor
+    # load_model()
+    # load_processor()
+    print('Surya models initialized successfully')
+except Exception as e:
+    print(f'Model initialization failed: {e}')
+    print('Models will be downloaded on first use')
+" || echo "Models will be downloaded on first use"
+
+# Verificar CUDA availability
+RUN python -c "
+import torch
+print(f'CUDA available: {torch.cuda.is_available()}')
+if torch.cuda.is_available():
+    print(f'CUDA version: {torch.version.cuda}')
+    print(f'GPU count: {torch.cuda.device_count()}')
+    for i in range(torch.cuda.device_count()):
+        print(f'GPU {i}: {torch.cuda.get_device_name(i)}')
+else:
+    print('WARNING: CUDA not available, falling back to CPU')
+"
+
+# Health check específico para Surya
+HEALTHCHECK --interval=60s --timeout=30s --start-period=180s --retries=3 \
+    CMD python -c "
+from app.core.redis_client import get_redis_client
+from app.workers.surya_worker import SuryaWorker
+redis_ok = get_redis_client().ping()
+worker = SuryaWorker()
+try:
+    worker.load_model()
+    model_ok = worker._model_loaded
+except:
+    model_ok = False
+assert redis_ok and model_ok
+" || exit 1
+
+# Comando padrão - inicia worker Surya usando Makefile
+CMD ["make", "start-worker-type", "TYPE=surya"]

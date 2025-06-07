@@ -1,0 +1,90 @@
+# OCR Platform - Base Dependencies
+# =================================
+# Dependências comuns a todos os componentes do sistema
+
+# Core Python packages
+pydantic>=2.0.0,<3.0.0
+python-dotenv>=1.0.0
+pathlib2>=2.3.0; python_version < "3.4"
+
+# Redis client
+redis>=4.5.0,<6.0.0
+hiredis>=2.2.0  # Redis performance boost
+
+# Celery for distributed task queue
+celery>=5.2.0,<6.0.0
+kombu>=5.2.0,<6.0.0
+billiard>=3.6.0,<5.0.0
+
+# Image processing
+Pillow>=9.5.0,<11.0.0
+opencv-python>=4.7.0,<5.0.0
+numpy>=1.21.0,<2.0.0
+
+# File type detection
+python-magic>=0.4.27
+filetype>=1.2.0
+
+# HTTP client
+requests>=2.28.0,<3.0.0
+httpx>=0.24.0,<1.0.0
+
+# Date and time utilities
+python-dateutil>=2.8.0,<3.0.0
+
+# Logging and configuration
+loguru>=0.7.0,<1.0.0
+structlog>=22.3.0,<24.0.0
+
+# JSON handling
+orjson>=3.8.0,<4.0.0  # Fast JSON library
+
+# Async utilities
+asyncio-throttle>=1.0.0,<2.0.0
+
+# Text processing
+regex>=2022.10.0,<2024.0.0
+chardet>=5.1.0,<6.0.0
+
+# Progress bars and CLI utilities
+tqdm>=4.64.0,<5.0.0
+click>=8.1.0,<9.0.0
+
+# Monitoring and metrics
+psutil>=5.9.0,<6.0.0
+
+# PDF processing
+PyMuPDF>=1.22.0,<2.0.0  # fitz
+
+# Archive handling
+py7zr>=0.20.0,<1.0.0
+
+# Environment and configuration validation
+pydantic-settings>=2.0.0,<3.0.0
+
+# Timezone handling
+pytz>=2023.3
+
+# Hash and encryption utilities
+hashlib2>=1.0.0; python_version < "3.2"
+
+# Memory profiling (optional)
+memory-profiler>=0.60.0,<1.0.0
+
+# Exception handling and debugging
+sentry-sdk>=1.20.0,<2.0.0  # Error tracking (optional)
+
+# Performance profiling
+cProfile2>=0.1.0; python_version >= "3.6"
+
+# Data validation
+cerberus>=1.3.4,<2.0.0
+
+# URL parsing
+yarl>=1.8.0,<2.0.0
+
+# Concurrent futures backport
+futures>=3.4.0; python_version < "3.2"
+
+# File watching (for development)
+watchdog>=3.0.0,<4.0.0

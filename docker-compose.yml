@@ -1,0 +1,212 @@
+# OCR Platform - Docker Compose
+# ==============================
+# Stack completa com API, Workers e Redis
+
+version: '3.8'
+
+services:
+  # Redis - Message Broker e Cache
+  redis:
+    image: redis:7-alpine
+    container_name: ocr-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+      - ./docker/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    command: redis-server /usr/local/etc/redis/redis.conf
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ocr_network
+
+  # API FastAPI
+  api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.api
+    container_name: ocr-api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - ENVIRONMENT=production
+      - DEBUG=false
+      - LOG_LEVEL=INFO
+    volumes:
+      - ./uploads:/app/uploads
+      - ./results:/app/results
+      - ./temp:/app/temp
+      - ./logs:/app/logs
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    networks:
+      - ocr_network
+
+  # Workers Base (PaddleOCR, EasyOCR, Tesseract)
+  workers-base:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.worker
+    container_name: ocr-workers-base
+    restart: unless-stopped
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - ENVIRONMENT=production
+      - DEBUG=false
+      - LOG_LEVEL=INFO
+      - WORKER_TYPE=base
+    volumes:
+      - ./uploads:/app/uploads
+      - ./results:/app/results
+      - ./temp:/app/temp
+      - ./logs:/app/logs
+      - worker_cache:/app/cache
+    depends_on:
+      redis:
+        condition: service_healthy
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
+        reservations:
+          cpus: '1.0'
+          memory: 2G
+    networks:
+      - ocr_network
+
+  # Worker TrOCR (GPU)
+  worker-trocr:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.trocr
+    container_name: ocr-worker-trocr
+    restart: unless-stopped
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - ENVIRONMENT=production
+      - DEBUG=false
+      - LOG_LEVEL=INFO
+      - WORKER_TYPE=trocr
+      - CUDA_VISIBLE_DEVICES=0
+    volumes:
+      - ./uploads:/app/uploads
+      - ./results:/app/results
+      - ./temp:/app/temp
+      - ./logs:/app/logs
+      - trocr_cache:/app/cache
+      - trocr_models:/app/models
+    depends_on:
+      redis:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 8G
+        reservations:
+          memory: 4G
+        # GPU support (Docker Compose v2.3+)
+        # reservations:
+        #   devices:
+        #     - driver: nvidia
+        #       count: 1
+        #       capabilities: [gpu]
+    networks:
+      - ocr_network
+
+  # Worker Surya (GPU)
+  worker-surya:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.surya
+    container_name: ocr-worker-surya
+    restart: unless-stopped
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - ENVIRONMENT=production
+      - DEBUG=false
+      - LOG_LEVEL=INFO
+      - WORKER_TYPE=surya
+      - CUDA_VISIBLE_DEVICES=0
+    volumes:
+      - ./uploads:/app/uploads
+      - ./results:/app/results
+      - ./temp:/app/temp
+      - ./logs:/app/logs
+      - surya_cache:/app/cache
+      - surya_models:/app/models
+    depends_on:
+      redis:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 8G
+        reservations:
+          memory: 4G
+    networks:
+      - ocr_network
+
+  # Flower - Monitoramento Celery
+  flower:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.worker
+    container_name: ocr-flower
+    restart: unless-stopped
+    ports:
+      - "5555:5555"
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - ENVIRONMENT=production
+    command: >
+      celery -A app.core.celery_app flower
+      --port=5555
+      --basic_auth=admin:admin
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - ocr_network
+
+# Volumes
+volumes:
+  redis_data:
+    driver: local
+  worker_cache:
+    driver: local
+  trocr_cache:
+    driver: local
+  trocr_models:
+    driver: local
+  surya_cache:
+    driver: local
+  surya_models:
+    driver: local
+
+# Networks
+networks:
+  ocr_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

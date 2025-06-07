@@ -1,0 +1,143 @@
+# OCR Platform - TrOCR Dependencies
+# =================================
+# Dependências específicas para o worker TrOCR (manuscritos)
+
+# Include base dependencies
+-r base.txt
+
+# PyTorch ecosystem (required for TrOCR)
+torch>=2.0.0,<3.0.0
+torchvision>=0.15.0,<1.0.0
+torchaudio>=2.0.0,<3.0.0
+
+# Transformers library (Microsoft TrOCR)
+transformers>=4.30.0,<5.0.0
+tokenizers>=0.13.0,<1.0.0
+
+# HuggingFace Hub for model downloads
+huggingface-hub>=0.15.0,<1.0.0
+
+# Datasets library (for training/fine-tuning)
+datasets>=2.12.0,<3.0.0
+
+# Accelerate for distributed training
+accelerate>=0.20.0,<1.0.0
+
+# Image processing for TrOCR
+torchvision>=0.15.0,<1.0.0
+timm>=0.9.0,<1.0.0  # PyTorch Image Models
+
+# Text processing
+sentencepiece>=0.1.99,<1.0.0
+sacremoses>=0.0.53,<1.0.0
+
+# Tokenization
+tokenizers>=0.13.0,<1.0.0
+
+# Model optimization
+torch-optimizer>=0.3.0,<1.0.0
+transformers-interpret>=0.10.0,<1.0.0
+
+# ONNX support for model optimization
+onnx>=1.14.0,<2.0.0
+onnxruntime>=1.15.0,<2.0.0
+onnxruntime-gpu>=1.15.0,<2.0.0  # GPU version
+
+# TensorRT for NVIDIA optimization (optional)
+nvidia-tensorrt>=8.6.0,<9.0.0; platform_machine == "x86_64"
+
+# Model quantization
+bitsandbytes>=0.39.0,<1.0.0
+
+# Memory optimization
+transformers-memory-efficient>=0.1.0,<1.0.0
+
+# Mixed precision training
+apex>=0.1; platform_machine == "x86_64"  # NVIDIA Apex (optional)
+
+# Evaluation metrics
+evaluate>=0.4.0,<1.0.0
+rouge-score>=0.1.2,<1.0.0
+sacrebleu>=2.3.0,<3.0.0
+
+# Image augmentation for training
+albumentations>=1.3.0,<2.0.0
+
+# Progress tracking
+wandb>=0.15.0,<1.0.0  # Weights & Biases (optional)
+tensorboard>=2.13.0,<3.0.0
+
+# Configuration management
+omegaconf>=2.3.0,<3.0.0
+hydra-core>=1.3.0,<2.0.0
+
+# Distributed training
+deepspeed>=0.9.0,<1.0.0; platform_machine == "x86_64"
+
+# Model serving
+torchserve>=0.8.0,<1.0.0
+
+# Custom TrOCR utilities
+Pillow>=9.5.0,<11.0.0
+opencv-python>=4.7.0,<5.0.0
+
+# Text post-processing
+regex>=2022.10.0,<2024.0.0
+ftfy>=6.1.0,<7.0.0  # Fix text encoding issues
+
+# Model caching
+diskcache>=5.6.0,<6.0.0
+
+# Performance profiling for GPU
+nvgpu>=0.9.0,<1.0.0; platform_machine == "x86_64"
+pynvml>=11.5.0,<12.0.0; platform_machine == "x86_64"
+
+# Mathematical processing
+numpy>=1.21.0,<2.0.0
+scipy>=1.9.0,<2.0.0
+
+# Handwriting-specific processing
+opencv-contrib-python>=4.7.0,<5.0.0
+scikit-image>=0.20.0,<1.0.0
+
+# Text similarity for confidence estimation
+sentence-transformers>=2.2.0,<3.0.0
+
+# Language models for post-processing
+spacy>=3.5.0,<4.0.0
+
+# Custom image preprocessing
+wand>=0.6.11,<1.0.0  # ImageMagick
+
+# GPU memory management
+GPUtil>=1.4.0,<2.0.0; platform_machine == "x86_64"
+
+# Model compression
+torch-pruning>=1.2.0,<2.0.0
+
+# Visualization for debugging
+matplotlib>=3.6.0,<4.0.0
+seaborn>=0.12.0,<1.0.0
+
+# Export models for deployment
+torch2trt>=0.4.0,<1.0.0; platform_machine == "x86_64"  # TensorRT
+
+# Advanced image preprocessing
+cv2-extras>=0.5.0,<1.0.0
+image-enhance>=0.1.0,<1.0.0
+
+# Memory profiling for large models
+memray>=1.7.0,<2.0.0; python_version >= "3.7"
+
+# Model versioning
+mlflow>=2.3.0,<3.0.0
+
+# Configuration validation
+pydantic>=2.0.0,<3.0.0
+
+# Async processing
+asyncio>=3.4.3
+aiofiles>=23.1.0,<24.0.0
+
+# Character recognition utilities
+easyocr>=1.7.0,<2.0.0  # For comparison and fallback

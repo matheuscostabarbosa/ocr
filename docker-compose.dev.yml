@@ -1,0 +1,177 @@
+# OCR Platform - Development Docker Compose
+# ==========================================
+# Stack de desenvolvimento com hot-reload e debug
+
+version: '3.8'
+
+services:
+  # Redis - Message Broker e Cache
+  redis:
+    image: redis:7-alpine
+    container_name: ocr-redis-dev
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    networks:
+      - ocr_network_dev
+
+  # API FastAPI com hot-reload
+  api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.api
+      target: dependencies  # Para para stage de dependências
+    container_name: ocr-api-dev
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+      - "8001:8001"  # Porta adicional para debug
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - ENVIRONMENT=development
+      - DEBUG=true
+      - LOG_LEVEL=DEBUG
+      - PYTHONPATH=/app
+    volumes:
+      # Hot-reload: montar código fonte
+      - ./app:/app/app
+      - ./scripts:/app/scripts
+      - ./.env:/app/.env
+      - ./uploads:/app/uploads
+      - ./results:/app/results
+      - ./temp:/app/temp
+      - ./logs:/app/logs
+    command: make start-api
+    depends_on:
+      - redis
+    networks:
+      - ocr_network_dev
+
+  # Worker Base para desenvolvimento
+  worker-base:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.worker
+      target: dependencies
+    container_name: ocr-worker-base-dev
+    restart: unless-stopped
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - ENVIRONMENT=development
+      - DEBUG=true
+      - LOG_LEVEL=DEBUG
+      - WORKER_TYPE=base
+      - PYTHONPATH=/app
+    volumes:
+      # Hot-reload: montar código fonte
+      - ./app:/app/app
+      - ./scripts:/app/scripts
+      - ./.env:/app/.env
+      - ./uploads:/app/uploads
+      - ./results:/app/results
+      - ./temp:/app/temp
+      - ./logs:/app/logs
+      - dev_worker_cache:/app/cache
+    command: make start-workers
+    depends_on:
+      - redis
+    networks:
+      - ocr_network_dev
+
+  # Flower - Monitoramento Celery
+  flower:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.worker
+      target: dependencies
+    container_name: ocr-flower-dev
+    restart: unless-stopped
+    ports:
+      - "5555:5555"
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - ENVIRONMENT=development
+      - PYTHONPATH=/app
+    volumes:
+      - ./app:/app/app
+      - ./.env:/app/.env
+    command: >
+      celery -A app.core.celery_app flower
+      --port=5555
+      --basic_auth=admin:admin
+      --debug
+    depends_on:
+      - redis
+    networks:
+      - ocr_network_dev
+
+  # Redis Commander - GUI para Redis
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: ocr-redis-commander-dev
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+      - HTTP_USER=admin
+      - HTTP_PASSWORD=admin
+    depends_on:
+      - redis
+    networks:
+      - ocr_network_dev
+
+  # Jupyter para análise e desenvolvimento
+  jupyter:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.worker
+      target: dependencies
+    container_name: ocr-jupyter-dev
+    restart: unless-stopped
+    ports:
+      - "8888:8888"
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - ENVIRONMENT=development
+      - PYTHONPATH=/app
+    volumes:
+      - ./app:/app/app
+      - ./scripts:/app/scripts
+      - ./notebooks:/app/notebooks
+      - ./.env:/app/.env
+      - ./uploads:/app/uploads
+      - ./results:/app/results
+      - ./temp:/app/temp
+      - dev_worker_cache:/app/cache
+    command: >
+      jupyter lab
+      --ip=0.0.0.0
+      --port=8888
+      --no-browser
+      --allow-root
+      --NotebookApp.token=''
+      --NotebookApp.password=''
+    depends_on:
+      - redis
+    networks:
+      - ocr_network_dev
+    working_dir: /app
+
+# Volumes para desenvolvimento
+volumes:
+  dev_worker_cache:
+    driver: local
+
+# Networks para desenvolvimento
+networks:
+  ocr_network_dev:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.21.0.0/16

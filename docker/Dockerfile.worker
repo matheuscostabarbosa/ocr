@@ -1,0 +1,119 @@
+# OCR Platform - Base Worker Dockerfile
+# ======================================
+# Container para workers básicos (PaddleOCR, EasyOCR, Tesseract)
+
+FROM python:3.11-slim as base
+
+# Metadados
+LABEL maintainer="OCR Platform Team"
+LABEL version="2.0.0"
+LABEL description="OCR Platform Base Workers Container"
+
+# Variáveis de ambiente
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    DEBIAN_FRONTEND=noninteractive \
+    WORKER_TYPE=base
+
+# Instalar dependências do sistema para OCR
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    # Ferramentas básicas
+    curl \
+    git \
+    build-essential \
+    pkg-config \
+    # OpenCV dependencies
+    libopencv-dev \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender-dev \
+    libgomp1 \
+    # Tesseract OCR
+    tesseract-ocr \
+    tesseract-ocr-por \
+    tesseract-ocr-eng \
+    tesseract-ocr-spa \
+    tesseract-ocr-fra \
+    libtesseract-dev \
+    # Ferramentas de imagem
+    libgl1-mesa-glx \
+    libglib2.0-0 \
+    libfontconfig1 \
+    libxrender1 \
+    libxtst6 \
+    # PaddlePaddle dependencies
+    libgomp1 \
+    # Cleanup
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+# Criar usuário não-root
+RUN groupadd -r ocruser && useradd -r -g ocruser ocruser
+
+# Criar diretórios
+RUN mkdir -p /app /app/uploads /app/results /app/temp /app/logs /app/cache && \
+    chown -R ocruser:ocruser /app
+
+WORKDIR /app
+
+# === STAGE: Dependências ===
+FROM base as dependencies
+
+# Copiar requirements
+COPY requirements/base.txt requirements/workers.txt ./requirements/
+
+# Instalar dependências Python
+RUN pip install --upgrade pip && \
+    pip install -r requirements/base.txt && \
+    pip install -r requirements/workers.txt
+
+# Instalar engines específicos
+RUN pip install \
+    # PaddleOCR com PaddlePaddle CPU
+    paddlepaddle==2.5.2 \
+    paddleocr==2.7.3 \
+    # EasyOCR
+    easyocr==1.7.0 \
+    # Tesseract Python wrapper
+    pytesseract==0.3.10 \
+    # Adicionais para processamento de imagem
+    Pillow==10.0.1 \
+    opencv-python-headless==4.8.1.78 \
+    numpy==1.24.3
+
+# === STAGE: Aplicação ===
+FROM dependencies as application
+
+# Copiar código da aplicação
+COPY --chown=ocruser:ocruser app/ ./app/
+COPY --chown=ocruser:ocruser scripts/ ./scripts/
+COPY --chown=ocruser:ocruser Makefile ./Makefile
+COPY --chown=ocruser:ocruser .env.example ./.env
+
+# Instalar make
+USER root
+RUN apt-get update && apt-get install -y --no-install-recommends make && \
+    rm -rf /var/lib/apt/lists/*
+
+# Fazer scripts executáveis
+RUN chmod +x scripts/start_workers.py
+
+# Configurar cache de modelos
+ENV EASYOCR_MODULE_PATH=/app/cache/easyocr
+ENV PADDLEOCR_HOME=/app/cache/paddleocr
+
+# Mudar para usuário não-root
+USER ocruser
+
+# Pre-download de modelos EasyOCR mais comuns (otimização)
+RUN python -c "import easyocr; reader = easyocr.Reader(['pt', 'en'], gpu=False)" || true
+
+# Health check para workers
+HEALTHCHECK --interval=60s --timeout=30s --start-period=120s --retries=3 \
+    CMD python -c "from app.core.redis_client import get_redis_client; assert get_redis_client().ping()" || exit 1
+
+# Comando padrão - inicia workers básicos usando Makefile
+CMD ["make", "start-workers"]
